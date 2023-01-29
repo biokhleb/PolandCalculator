@@ -5,13 +5,13 @@
 #include <conio.h>
 #include <iomanip>
 
+const double PI = 3.14159;
+const double HALFPI = PI / 2;
+
 int getPriority(char ch)
 {
     switch (ch)
     {
-    case '(':
-        return 0;
-        break;
     case '+':
     case '-':
         return 2;
@@ -26,6 +26,17 @@ int getPriority(char ch)
         break;
     case '^':
         return 5;
+        break;
+    case 's':
+    case 'c':
+    case 't':
+    case 'k':
+    case 'S':
+    case 'C':
+    case 'T':
+    case 'K':
+    case char(251):
+        return 6;
         break;
     default:
         return -1;
@@ -59,6 +70,108 @@ std::string getStringNumber(std::string exp, int *begin)
     return number;
 }
 
+std::string getStringFunction(std::string exp, int *begin)
+{
+    // Получаем символ
+    char ch = exp[*begin];
+    // Переменная цикла
+    int *i = begin;
+    // Считанная слово или функция, начинающееся с уже обнаруженного символа
+    std::string func = "";
+    func += ch;
+
+    while (*i + 1 <= exp.length() && isalpha(ch = exp[*i + 1]) && ch != ' ')
+    {
+        // Записываем цифру в итоговое число
+        func += ch;
+        *i = *i + 1;
+    }
+
+    // Возвращаем слово
+    return func;
+}
+
+// Формат строки для последующего чтения
+std::string formatExpression(std::string exp)
+{
+    // Выходная строка
+    std::string outexp = "";
+
+    for (int i = 0; i < exp.length(); i++)
+    {
+        char ch = exp[i];
+
+        // Если это буква
+        if (isalpha(ch))
+        {
+            // Считываем функцию
+            std::string func = getStringFunction(exp, &i);
+
+            // Тригонометрические
+            if (func == "sin")
+            {
+                outexp += 's';
+            }
+            else if (func == "cos")
+            {
+                outexp += 'c';
+            }
+            else if (func == "tg" || func == "tan")
+            {
+                outexp += 't';
+            }
+            else if (func == "ctg" || func == "ctan")
+            {
+                outexp += 'k';
+            }
+            // Обратные тригонометрические
+            else if (func == "arcsin" || func == "asin")
+            {
+                outexp += 'S';
+            }
+            else if (func == "arccos" || func == "acos")
+            {
+                outexp += 'C';
+            }
+            else if (func == "arctg" || func == "arctan" || func == "atg" || func == "atan")
+            {
+                outexp += 'T';
+            }
+            else if (func == "arcctg" || func == "arcctan" || func == "actg" || func == "actan")
+            {
+                outexp += 'K';
+            }
+            // Корень
+            else if (func == "sqrt")
+            {
+                outexp += char(251);
+            }
+            // Константы
+            else if (func == "pi")
+            {
+                outexp += std::to_string(PI);
+            }
+            // Неизвестная структура
+            else
+            {
+                outexp += "Error";
+            }
+        }
+        else if (ch != ' ')
+        {
+            outexp += ch;
+        }
+
+        // Неявный знак умножения перед скобкой
+        if (isNumber(ch) && (i + 1) < exp.length() && exp[i + 1] == '(')
+        {
+            outexp += '*';
+        }
+    }
+
+    return outexp;
+}
+
 std::string getPostfix(std::string inputExpression)
 {
     // Выходная строка
@@ -68,22 +181,7 @@ std::string getPostfix(std::string inputExpression)
     // Вектор операторов
     std::vector<char> opers;
 
-    // Составляем строку без пробелов
-    for (int i = 0; i < inputExpression.length(); i++)
-    {
-        char ch = inputExpression[i];
-
-        // Без пробелов
-        if (ch != ' ')
-        {
-            myexp += ch;
-        }
-        // Неявный знак умножения перед скобкой
-        if (isNumber(ch) && (i + 1) < inputExpression.length() && inputExpression[i + 1] == '(')
-        {
-            myexp += '*';
-        }
-    }
+    myexp = formatExpression(inputExpression);
 
     // Пока есть необработанные символы
     char symbol;
@@ -142,6 +240,11 @@ std::string getPostfix(std::string inputExpression)
                     outputString += opers[vecSize - j];
                     // Удаляем из вектора
                     opers.erase(opers.begin() + (vecSize - j));
+                }
+                // Если это открывающая скобка, то дальше не лезем
+                else if (opers[vecSize - j] == '(')
+                {
+                    break;
                 }
                 // Идём дальше
                 j++;
@@ -202,9 +305,41 @@ double calcPosfixExpression(std::string strExp)
                 double rightOperand = numbers[numbers.size() - 1];
 
                 // Унарные операции
-                if (ch == '~')
+                if (ch == '~' || getPriority(ch) == 6)
                 {
-                    localResult = rightOperand * -1;
+                    switch (ch)
+                    {
+                    case '~':
+                        localResult = rightOperand * -1;
+                        break;
+                    case 's':
+                        localResult = sin(rightOperand);
+                        break;
+                    case 'c':
+                        localResult = cos(rightOperand);
+                        break;
+                    case 't':
+                        localResult = tan(rightOperand);
+                        break;
+                    case 'k':
+                        localResult = 1 / tan(rightOperand);
+                        break;
+                    case 'S':
+                        localResult = asin(rightOperand);
+                        break;
+                    case 'C':
+                        localResult = acos(rightOperand);
+                        break;
+                    case 'T':
+                        localResult = atan(rightOperand);
+                        break;
+                    case 'K':
+                        localResult = atan(-rightOperand) + HALFPI;
+                        break;
+                    case char(251):
+                        localResult = sqrt(rightOperand);
+                        break;
+                    }
 
                     // Удаляем использованные операнды
                     numbers.pop_back();
@@ -251,7 +386,7 @@ double calcPosfixExpression(std::string strExp)
         }
     }
 
-    // Если сотались только числа без бинарных знаков (с унарными минусами)
+    // Если сотались только числа без бинарных знаков (с минусами)
     while (numbers.size() > 1)
     {
         double rightOperand = numbers[numbers.size() - 1];
@@ -304,10 +439,17 @@ int main()
         "((-2)^4+(-1)^3*7)/(-3)^2",
         "12*(4*3)/2",
         "2+20*10+(2*10^2)/2",
+        "cos(-14)+sqrt(5)-16",
+        "(22(sin(pi)^2-cos(pi)^2))/4",
+        "sqrt(2)",
+        "((arccos(1)-0.5)^2)^2+sqrt(2)",
+        "(sqrt(4)+2)^2",
+        "(1/tg(4))*2.4",
+        "pi*6^2",
     };
     double answers[]{
         16,
-        25.5,
+        25,
         -2,
         9,
         9,
@@ -315,14 +457,21 @@ int main()
         -4,
         -104,
         2,
-        115.5,
+        115,
         16,
-        0.5,
+        0,
         7,
         162,
         1,
         72,
         302,
+        -13,
+        -5,
+        1,
+        1,
+        16,
+        2,
+        113,
     };
 
     // Кол-во примеров
@@ -339,10 +488,29 @@ int main()
         postfix = getPostfix(exp);
         result = calcPosfixExpression(postfix);
 
-        std::cout << std::setiosflags(std::ios::left) << std::setw(10) << (int(result) == int(answ) ? "ok" : "wtf");
-        std::cout << std::setiosflags(std::ios::left) << std::setw(30) << exp;
-        std::cout << std::setiosflags(std::ios::left) << " = " << std::setw(15) << result;
-        std::cout << std::setiosflags(std::ios::left) << std::setw(20) << "posfix view:" << postfix << "\n\n";
+        std::cout << char(186) << std::left << std::setw(10) << (int(result) == int(answ) ? "ok" : "wtf") << char(186);
+        std::cout << std::left << std::setw(40) << exp;
+        std::cout << std::left << " = " << std::setw(15) << result << char(186);
+        std::cout << std::right << std::setw(45) << postfix << "  " << char(186) << std::endl;
+
+        // Рисуем рамку
+        std::cout << char(199);
+        for (int i = 0; i < 10; i++)
+        {
+            std::cout << char(196);
+        }
+        std::cout << char(215);
+        for (int i = 0; i < 58; i++)
+        {
+            std::cout << char(196);
+        }
+        std::cout << char(215);
+        for (int i = 0; i < 47; i++)
+        {
+            std::cout << char(196);
+        }
+        std::cout << char(182);
+        std::cout << std::endl;
     }
 
     // Нажать кнопку перед выходом
